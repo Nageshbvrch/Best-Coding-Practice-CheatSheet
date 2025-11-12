@@ -14,10 +14,14 @@ import numpy as np
 import math
 from dataclasses import dataclass
 from typing import Tuple, List
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Wedge
 from matplotlib.animation import FuncAnimation
 import IPython.display as ipydisplay
+
+# Use system fallback fonts to avoid warnings for the ✈ symbol
+matplotlib.rcParams["font.family"] = ["DejaVu Sans", "sans-serif"]
 
 # ---------------------------
 # Aircraft state
@@ -228,9 +232,11 @@ class DAIDALUSVisualizer:
         self.ax = self.fig.add_axes([0.08, 0.15, 0.60, 0.75])
         self._setup_axes()
 
-        # animated artists
-        self.own_marker, = self.ax.plot([], [], 'o', ms=12)
-        self.int_marker, = self.ax.plot([], [], 'o', ms=12)
+        # animated artists - using airplane symbols ✈
+        self.own_marker = self.ax.text(0, 0, '✈', fontsize=24, ha='center', va='center',
+                                       fontweight='bold', zorder=10)
+        self.int_marker = self.ax.text(0, 0, '✈', fontsize=24, ha='center', va='center',
+                                       fontweight='bold', zorder=10)
         self.own_label = self.ax.text(0, 0, '', fontsize=10,
                                       bbox=dict(boxstyle="round,pad=0.3", fc='white', alpha=0.8))
         self.int_label = self.ax.text(0, 0, '', fontsize=10,
@@ -298,10 +304,11 @@ class DAIDALUSVisualizer:
             "   outside WCV\n\n"
             "● RED: Danger\n"
             "   Intruder near or within WCV\n\n"
-            "AIRCRAFT MARKERS:\n"
-            "● ↑ Climbing\n"
-            "● ↓ Descending\n"
-            "● → Level flight\n\n"
+            "AIRCRAFT SYMBOLS:\n"
+            "● ✈ Airplane marker\n"
+            "● ↑ Climbing (blue ✈)\n"
+            "● ↓ Descending (orange ✈)\n"
+            "● → Level flight (gray ✈)\n\n"
             f"Configuration:\n"
             f"DMOD: {self.cfg.DMOD:.0f}m\n"
             f"ZTHR: {self.cfg.ZTHR:.0f}m\n"
@@ -349,8 +356,17 @@ class DAIDALUSVisualizer:
         center = (own.y, own.x)
         inner_r, outer_r = self.cfg.BAND_INNER_M, self.cfg.BAND_OUTER_M
 
-        # Current distance from ownship to intruder
+        # Current distance from ownship to intruder - THIS IS THE KEY!
         current_distance = np.linalg.norm(own.position_2d - intr.position_2d)
+
+        # Determine the threat level based on CURRENT distance
+        # This ensures bands are green when intruder is far away
+        if current_distance > self.cfg.SST_RADIUS:
+            threat_level = "SAFE"  # Beyond SST - all green
+        elif current_distance > self.cfg.WCV_RADIUS:
+            threat_level = "CAUTION"  # Within SST but outside WCV - amber for conflicts
+        else:
+            threat_level = "DANGER"  # Within WCV - red for conflicts
 
         for deg in range(0, 360, self.cfg.TRACK_STEP_DEG):
             theta = math.radians(deg)
@@ -361,30 +377,32 @@ class DAIDALUSVisualizer:
             t_in, t_out = detector.detect_interval(hypo, intr, 0.0, self.cfg.LOOKAHEAD_TIME)
 
             # DISTANCE-BASED color classification
-            # Key concept: Color depends on how close intruder is to SST/WCV circles
+            # Key concept: Base color on CURRENT distance, not predicted closest approach
             if t_in <= t_out:  # Conflict exists in this direction
-                # Calculate closest approach distance for this heading
-                s = hypo.position_2d - intr.position_2d
-                v = hypo.velocity_2d - intr.velocity_2d
-                closest_distance = GeometricUtils.dcpa(s, v)
-
-                # Color based on closest approach distance
-                if closest_distance <= self.cfg.WCV_RADIUS:
-                    # Within or very close to WCV - RED (Danger)
-                    color = '#DC143C'  # Crimson red
-                    alpha = 0.7
-                elif closest_distance <= self.cfg.SST_RADIUS:
-                    # Between WCV and SST - AMBER (Caution)
-                    color = '#FFB000'  # Amber
-                    alpha = 0.6
-                else:
-                    # Beyond SST but still conflict - Light GREEN
+                # Color based on current distance threat level
+                if threat_level == "SAFE":
+                    # Intruder far away - even conflict directions stay green
                     color = '#90EE90'  # Light green
                     alpha = 0.5
+                elif threat_level == "CAUTION":
+                    # Intruder within SST - conflict directions are AMBER
+                    color = '#FFB000'  # Amber
+                    alpha = 0.6
+                else:  # DANGER
+                    # Intruder within WCV - conflict directions are RED
+                    color = '#DC143C'  # Crimson red
+                    alpha = 0.7
             else:
-                # No conflict in this direction - GREEN (Safe)
-                color = '#228B22'  # Forest green
-                alpha = 0.5
+                # No conflict in this direction - always GREEN but shade varies
+                if threat_level == "SAFE":
+                    color = '#228B22'  # Forest green
+                    alpha = 0.5
+                elif threat_level == "CAUTION":
+                    color = '#90EE90'  # Light green
+                    alpha = 0.5
+                else:  # DANGER
+                    color = '#FFD700'  # Gold (non-conflict but still close)
+                    alpha = 0.5
 
             # Draw wedge centered on ownship
             start = 90 - deg - self.cfg.TRACK_STEP_DEG/2
@@ -409,11 +427,11 @@ class DAIDALUSVisualizer:
         self.sst_circle.center = (own.y, own.x)
         self.wcv_circle.center = (own.y, own.x)
 
-        # markers (1-element sequences for Line2D)
+        # markers - airplane symbols ✈ with altitude-based coloring
         own_style, own_glyph = self._alt_marker_style(own.vz)
         int_style, int_glyph = self._alt_marker_style(intr.vz)
-        self.own_marker.set_data([own.y], [own.x])
-        self.int_marker.set_data([intr.y], [intr.x])
+        self.own_marker.set_position((own.y, own.x))
+        self.int_marker.set_position((intr.y, intr.x))
         self.own_marker.set_color(own_style["color"])
         self.int_marker.set_color(int_style["color"])
 

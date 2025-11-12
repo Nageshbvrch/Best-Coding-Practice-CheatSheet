@@ -3,6 +3,24 @@
 ## Overview
 This document describes the updates made to the DAIDALUS (Detect and Avoid Alerting Logic for Unmanned Systems) visualization system.
 
+## Latest Updates (v2)
+
+### **Aircraft Symbols**
+- ✈ **Airplane symbols** now used instead of dots for both ownship and intruder
+- Color-coded based on altitude changes:
+  - **Blue ✈**: Climbing aircraft
+  - **Orange ✈**: Descending aircraft
+  - **Gray ✈**: Level flight
+- Font configuration added to support Unicode airplane symbol without warnings
+
+### **Fixed Conflict Band Logic**
+The conflict bands now correctly start **ALL GREEN** when the intruder is far away and transition colors as it approaches:
+- **When starting** (intruder 8km away): ALL bands are GREEN
+- **As intruder approaches SST**: Conflict directions turn AMBER
+- **When near WCV**: Conflict directions turn RED
+
+This is based on the **CURRENT distance** of the intruder, not predicted closest approach, providing more intuitive and realistic behavior.
+
 ## Key Changes
 
 ### 1. **Axes Configuration**
@@ -69,25 +87,48 @@ Distance from Ownship:
 
 ## Implementation Details
 
-### Distance Calculation
+### Distance-Based Band Coloring (v2 Logic)
 ```python
-# Calculate closest approach distance for each heading
-closest_distance = GeometricUtils.dcpa(s, v)
+# Calculate CURRENT distance from ownship to intruder
+current_distance = np.linalg.norm(own.position_2d - intr.position_2d)
 
-# Color assignment based on distance thresholds
-if closest_distance <= WCV_RADIUS:
-    color = RED      # Danger
-elif closest_distance <= SST_RADIUS:
-    color = AMBER    # Caution
+# Determine threat level based on CURRENT distance
+if current_distance > SST_RADIUS:
+    threat_level = "SAFE"       # ALL bands green
+elif current_distance > WCV_RADIUS:
+    threat_level = "CAUTION"    # Conflict bands amber
 else:
-    color = GREEN    # Safe
+    threat_level = "DANGER"     # Conflict bands red
+
+# Apply colors to each direction based on conflict + threat level
+if conflict_exists:
+    if threat_level == "SAFE":
+        color = LIGHT_GREEN  # Even conflicts are green when far
+    elif threat_level == "CAUTION":
+        color = AMBER        # Conflicts are amber when approaching
+    else:
+        color = RED          # Conflicts are red when close
+else:
+    color = GREEN           # No conflict = green
+```
+
+### Aircraft Symbol Configuration
+```python
+# Font configuration to support ✈ symbol
+matplotlib.rcParams["font.family"] = ["DejaVu Sans", "sans-serif"]
+
+# Create airplane markers as text annotations
+own_marker = ax.text(0, 0, '✈', fontsize=24, ha='center', va='center')
+int_marker = ax.text(0, 0, '✈', fontsize=24, ha='center', va='center')
 ```
 
 ### Key Features
 1. **Real-time updates**: Circles and bands move with the ownship
-2. **Altitude awareness**: Aircraft markers show climb/descent status (↑↓→)
-3. **Comprehensive information**: Displays ground speed, altitude, separation distances
-4. **Clear visual hierarchy**: Color intensity indicates threat level
+2. **Airplane symbols**: Clear ✈ symbols for ownship and intruder aircraft
+3. **Altitude awareness**: Color-coded aircraft symbols show climb/descent status (Blue↑ Orange↓ Gray→)
+4. **Comprehensive information**: Displays ground speed, altitude, separation distances
+5. **Clear visual hierarchy**: Color intensity indicates threat level
+6. **Distance-based bands**: Bands correctly reflect current threat level, not future predictions
 
 ## Usage
 
@@ -99,9 +140,13 @@ python daidalus_visualization.py
 ### Requirements
 ```python
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Wedge
 from matplotlib.animation import FuncAnimation
+
+# Font configuration for airplane symbols
+matplotlib.rcParams["font.family"] = ["DejaVu Sans", "sans-serif"]
 ```
 
 ### Output
@@ -117,10 +162,13 @@ The default scenario simulates:
 
 ## Benefits
 1. ✅ **Intuitive understanding**: Colors directly represent distance-based threat levels
-2. ✅ **Clear documentation**: All circles and bands explained outside the plot
-3. ✅ **Realistic behavior**: Matches real-world collision avoidance systems
-4. ✅ **Equal scaling**: Proper geometric representation with equal axis dimensions
-5. ✅ **Comprehensive legend**: All information accessible without cluttering the plot
+2. ✅ **Clear visual markers**: Airplane symbols (✈) immediately recognizable
+3. ✅ **Correct band behavior**: Bands start green when far away, transition as intruder approaches
+4. ✅ **Clear documentation**: All circles and bands explained outside the plot
+5. ✅ **Realistic behavior**: Matches real-world collision avoidance systems
+6. ✅ **Equal scaling**: Proper geometric representation with equal axis dimensions
+7. ✅ **Comprehensive legend**: All information accessible without cluttering the plot
+8. ✅ **No font warnings**: Proper font configuration for Unicode symbols
 
 ## References
 - DAIDALUS: NASA's Detect and Avoid Alerting Logic for Unmanned Systems
