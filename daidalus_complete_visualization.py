@@ -488,22 +488,22 @@ def create_animation_scenario(scenario_type="vertical"):
     viz = DAIDALUSVisualizer(cfg)
 
     if scenario_type == "vertical":
-        # Vertical approach scenario
+        # Vertical approach scenario - Aircraft swap positions
         own = AircraftState(
             x=0,      # North
-            y=0,      # East
+            y=0,      # East - starts at 0
             z=1000,   # Altitude
             vx=0,     # No north movement
-            vy=0,     # No east movement
+            vy=25,    # Moving east at 25 m/s (will reach y=3000 in 120s)
             vz=0      # Level flight
         )
 
         intr = AircraftState(
             x=0,      # Same north position
-            y=3000,   # 3km to the east (approaching)
+            y=3000,   # 3km to the east - starts at 3000
             z=1000,   # Same altitude
             vx=0,     # No north movement
-            vy=-25,   # Moving west at 25 m/s (toward ownship)
+            vy=-25,   # Moving west at 25 m/s (will reach y=0 in 120s)
             vz=0      # Level flight
         )
 
