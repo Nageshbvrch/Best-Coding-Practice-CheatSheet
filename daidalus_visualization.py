@@ -495,6 +495,10 @@ def create_animation_scenario():
 
     # Aircraft start FAR APART (8km separation) and approach each other
     # Head-on collision course with altitude changes
+    #
+    # OWNSHIP TRAJECTORY (over 180s):
+    # START position: x=0m (North), y=0m (East), z=1000m (Alt)
+    # END position:   x=0+(50×180)=9000m North, y=0+(0×180)=0m East, z=1000+(1.0×180)=1180m Alt
     own = AircraftState(
         x=0,           # North position
         y=0,           # East position
@@ -504,6 +508,10 @@ def create_animation_scenario():
         vz=1.0         # Climbing at 1 m/s
     )
 
+    # INTRUDER TRAJECTORY (over 180s):
+    # START position: x=8000m (North), y=0m (East), z=1200m (Alt)
+    # END position:   x=8000+(-45×180)=-100m North, y=0+(0×180)=0m East, z=1200+(-0.8×180)=1056m Alt
+    # The aircraft will pass through each other around t=84s
     intr = AircraftState(
         x=8000,        # 8km North of ownship (FAR AWAY)
         y=0,           # Same East position (head-on)
