@@ -165,7 +165,7 @@ class ConflictDetection:
         H = max(self.cfg.ZTHR, self.cfg.TCOA * abs(vz))
         sign = 1.0 if vz >= 0 else -1.0
         t_in  = (-sign * H - sz) / vz
-        t_out = ( sign * self.cfg.ZTHR - sz) / vz
+        t_out = ( sign * H - sz) / vz
         if t_in > t_out:
             t_in, t_out = t_out, t_in
         if t1 < t_in or t_out < t0:
